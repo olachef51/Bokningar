@@ -425,7 +425,9 @@
 
               <label>
                 Datum
-                <input type="date" id="bookingDate" required />
+                <select id="bookingDate" required>
+                  <option value="">Välj datum</option>
+                </select>
               </label>
             </div>
 
@@ -438,7 +440,7 @@
               </select>
             </label>
 
-            <div class="small">Bokning kan endast göras för tisdag eller torsdag.</div>
+            <div class="small">Listan visar endast bokningsbara tisdagar och torsdagar.</div>
           </div>
 
           <div class="form-box">
@@ -496,6 +498,8 @@
     const TUESDAY_EMAIL = "sophie.verngren@malmo.se";
     const THURSDAY_EMAIL = "ola.ekdahl@malmo.se";
     const EMAIL_SUBJECT = "Bokning skolrestaurang";
+    const QR_TARGET_URL = "https://olachef51.github.io/Bokningar/";
+    const BOOKABLE_WEEKS_AHEAD = 16;
     /* slut Sektion 1A: INSTÄLLNINGAR */
 
     /* start Sektion 1B: ELEMENT */
@@ -516,19 +520,10 @@
 
     /* start Sektion 1C: INIT */
     (function initPage(){
-      setMinDate();
       bindTabs();
-      bindDateValidation();
+      buildBookableDateOptions();
       buildQrCode();
     })();
-
-    function setMinDate(){
-      const today = new Date();
-      const year = today.getFullYear();
-      const month = String(today.getMonth() + 1).padStart(2, "0");
-      const day = String(today.getDate()).padStart(2, "0");
-      bookingDate.min = `${year}-${month}-${day}`;
-    }
 
     function bindTabs(){
       tabButtons.forEach(btn => {
@@ -540,26 +535,32 @@
       });
     }
 
-    function bindDateValidation(){
-      bookingDate.addEventListener("change", () => {
-        if(!bookingDate.value) return;
-        if(!isAllowedBookingDate(bookingDate.value)){
-          showNotice("Välj en tisdag eller torsdag för bokning.", "warn");
-          bookingDate.value = "";
-        }else{
-          const weekday = getWeekdayName(bookingDate.value);
-          const targetEmail = getRecipientByDate(bookingDate.value);
-          showNotice(`${weekday} vald. Bokningen skickas till ${targetEmail}.`, "ok");
+    function buildBookableDateOptions(){
+      bookingDate.innerHTML = '<option value="">Välj datum</option>';
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const endDate = new Date(today);
+      endDate.setDate(endDate.getDate() + (BOOKABLE_WEEKS_AHEAD * 7));
+
+      for(let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)){
+        const weekday = d.getDay();
+        if(weekday === 2 || weekday === 4){
+          const isoDate = toIsoDate(d);
+          const label = `${getWeekdayNameFromNumber(weekday)} ${formatDateSwedish(isoDate)}`;
+          const opt = document.createElement("option");
+          opt.value = isoDate;
+          opt.textContent = label;
+          bookingDate.appendChild(opt);
         }
-      });
+      }
     }
 
     function buildQrCode(){
-      const pageUrl = window.location.href;
-      qrUrlText.textContent = pageUrl;
+      qrUrlText.textContent = QR_TARGET_URL;
       qrcodeEl.innerHTML = "";
       new QRCode(qrcodeEl, {
-        text: pageUrl,
+        text: QR_TARGET_URL,
         width: 260,
         height: 260
       });
@@ -600,10 +601,20 @@
     }
 
     function getWeekdayName(dateValue){
-      const weekday = getWeekdayNumber(dateValue);
+      return getWeekdayNameFromNumber(getWeekdayNumber(dateValue));
+    }
+
+    function getWeekdayNameFromNumber(weekday){
       if(weekday === 2) return "Tisdag";
       if(weekday === 4) return "Torsdag";
       return "";
+    }
+
+    function toIsoDate(dateObj){
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+      const day = String(dateObj.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
     }
     /* slut Sektion 1D: HJÄLPFUNKTIONER */
 
@@ -630,7 +641,6 @@
 
       const recipient = getRecipientByDate(date);
       const weekdayName = getWeekdayName(date);
-
       const mailBody =
 `Hej!
 
